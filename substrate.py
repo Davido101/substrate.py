@@ -43,7 +43,7 @@ def print_substrate_params(data):
 
 def parse_substrate(data):
 	substrate_fields = ('substrate_version','substrate_age','cell_count','environment_version','nutrient_rate','nutrient_chunk_size',
-						'radiation_level','light_amount','light_direction_change','light_range',None,'cell_type_count',
+						'radiation_level','light_amount','light_direction_change','light_range','substrate_viscosity','cell_type_count',
 						'spawn_phagocytes','spawn_flagellocytes','spawn_photocytes','spawn_devorocytes','spawn_lipocytes','spawn_keratinocytes',
 						'spawn_buoyocytes','spawn_glueocytes','spawn_virocytes','spawn_nitrocytes','spawn_stereocytes','spawn_senseocytes',
 						'spawn_myocytes','spawn_neurocytes','spawn_secrocytes','spawn_stemocytes','spawn_gametes','spawn_ciliocytes',
