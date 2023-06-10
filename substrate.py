@@ -70,10 +70,13 @@ def print_params(data):
 
 			key = key[0]
 
-		print(f"{key}: {data[key]*factor}{unit}")
+		value = data[key]
+		if isinstance(value,bool): value = 'yes' if value else 'no'
+		else: value *= factor
+		print(f"{key.replace('_',' ')}: {value}{unit}")
 
 def parse_substrate(data):
-	substrate_fields = ('substrate_version','substrate_age','cell_count','environment_version','nutrient_rate','nutrient_chunk_size',
+	substrate_fields = ('substrate_version',('substrate_age',1,'h'),'cell_count','environment_version','nutrient_rate','nutrient_chunk_size',
 						'radiation_level','light_amount','light_direction_change','light_range','substrate_viscosity','cell_type_count',
 						'spawn_phagocytes','spawn_flagellocytes','spawn_photocytes','spawn_devorocytes','spawn_lipocytes','spawn_keratinocytes',
 						'spawn_buoyocytes','spawn_glueocytes','spawn_virocytes','spawn_nitrocytes','spawn_stereocytes','spawn_senseocytes',
@@ -112,15 +115,17 @@ def parse_gene(data):
 	return zip_params(gene_fields,gene_params)
 
 def parse_gzip(data,ncells):
-	cell_fields = ('cell_version','x','y',None,None,
-				   ('x_speed',500,'µm/h'),('y_speed',500,'µm/h'),None,None,('cell_diameter',1000,'µm'),
-				   ('cell_mass',10,'ng'),('cell_age',1,'h'),'adhesin_connection_count','adhesin_connections',None,
-				   None,None,None,None,'gene_count',
-				   'genes',None,None,None,None,
-				   None,None,('nitrogen_reserve',100,'%'),None,None,
-				   None,None,None,None,None,
-				   None,None,('toxins',100,'%'),('cell_injury',100,'%'),None,
-				   None,None,('lipids',10,'ng'),None,None,None)
+	cell_fields = ('cell_version','x','y',None,
+				   None,('x_speed',500,'µm/h'),('y_speed',500,'µm/h'),None,
+				   None,('cell_diameter',1000,'µm'),('cell_mass',10,'ng'),('cell_age',1,'h'),
+				   'adhesin_connection_count',None,None,None,
+				   None,None,'gene_count',None,
+				   None,None,None,None,
+				   None,('nitrogen_reserve',100,'%'),None,None,
+				   None,None,None,None,
+				   None,None,None,('toxins',100,'%'),
+				   ('cell_injury',100,'%'),None,None,None,
+				   ('lipids',10,'ng'),None,None,None)
 
 	data = BytesIO(data)
 	param = read_double(data)
@@ -163,6 +168,7 @@ data = get_bytes(gzip.decompress(compressed))
 param,cells = parse_gzip(data,substrate_params['cell_count'])
 print()
 print(param)
+print()
 for cell in cells:
 	input('Press Enter to see next cell')
 	print()
