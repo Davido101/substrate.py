@@ -56,13 +56,14 @@ def read_struct(form,f,big_endian=True):
 	return list(struct.unpack(form,data))
 
 def zip_params(fields,params):
-	return OrderedDict(zip(map(lambda f:f[0] if isinstance(f,tuple) else f,fields),params))
+	return OrderedDict(zip(fields,params))
 
-def print_params(data):
+def print_params(data,depth=0):
 	for key in data.keys():
 		if key is None: continue
 		factor = 1
 		unit = ''
+		value = data[key]
 		if isinstance(key,tuple):
 			factor = key[1]
 			if len(key) >= 3:
@@ -70,10 +71,18 @@ def print_params(data):
 
 			key = key[0]
 
-		value = data[key]
+		key = key.replace('_',' ')
 		if isinstance(value,bool): value = 'yes' if value else 'no'
+		elif isinstance(value,list):
+			print(f"{key}:")
+			for e in value:
+				print_params(e,depth+1)
+
+			continue
 		else: value *= factor
-		print(f"{key.replace('_',' ')}: {value}{unit}")
+
+		prefix = '' if depth == 0 else '-'*depth+' '
+		print(f"{prefix}{key}: {value}{unit}")
 
 def parse_substrate(data):
 	substrate_fields = ('substrate_version',('substrate_age',1,'h'),'cell_count','environment_version','nutrient_rate','nutrient_chunk_size',
@@ -98,78 +107,88 @@ def parse_substrate(data):
 
 def parse_link(data):
 	link_fields = (None,None,None,None,None,None,None,None)
-	return read_struct("1i 2d 1? 2d 2f",data)
+	return zip_params(link_fields,read_struct("1i 2d 1? 2d 2f",data))
 
 def parse_gene(data):
 	gene_fields = (None,None,None,None,None,
 				   None,None,None,None,None,
 				   None,None,None,None,None,
 				   None,None,None,None,None,
-				   None,None,None,None,None)
+				   None,None,None,None,None,None)
 
 	gene_params = read_struct("1i 9f 2i 3? 2i 4? 1f",data)
+	extra0 = []
 	for _ in range(12):
-		gene_params += read_struct("2h 3f",data)
+		extra0.append(read_struct("2h 3f",data))
 
-	gene_params += read_struct("12i 2f",data)
+	extra1 = read_struct("12i",data)
+	gene_params += read_struct("2f",data)
+	gene_params.append(extra0)
+	gene_params.append(extra1)
 	return zip_params(gene_fields,gene_params)
 
 def parse_gzip(data,ncells):
-	cell_fields = ('cell_version','x','y',None,
-				   None,('x_speed',500,'µm/h'),('y_speed',500,'µm/h'),None,
-				   None,('cell_diameter',1000,'µm'),('cell_mass',10,'ng'),('cell_age',1,'h'),
-				   'adhesin_connection_count',None,None,None,
-				   None,None,'gene_count',None,
-				   None,None,None,None,
-				   None,('nitrogen_reserve',100,'%'),None,None,
-				   None,None,None,None,
-				   None,None,None,('toxins',100,'%'),
-				   ('cell_injury',100,'%'),None,None,None,
-				   ('lipids',10,'ng'),None,None,None)
+	cell_fields = ('genome_version','x','y',None,None,
+				   ('x_speed',500,'µm/h'),('y_speed',500,'µm/h'),None,None,('cell_diameter',1000,'µm'),
+				   ('cell_mass',10,'ng'),('cell_age',1,'h'),'adhesin_connection_count','adhesin_connections',None,
+				   None,None,None,None,'gene_count',
+				   'genes',None,None,None,None,
+				   None,None,('nitrogen_reserve',100,'%'),None,None,
+				   None,None,None,None,None,
+				   None,None,('toxins',100,'%'),('cell_injury',100,'%'),None,
+				   None,None,('lipids',10,'ng'),None,None,None)
 
 	data = BytesIO(data)
 	param = read_double(data)
 	cells = []
 
 	for _ in range(ncells):
-		version = read_int(data)
-		if version != 95:
-			error(f"Unsupported cell version: {version}")
+		genome_version = read_int(data)
+		if genome_version != 95:
+			error(f"Unsupported genome version: {genome_version}")
 
-		cell_params = [version]
+		cell_params = [genome_version]
 		cell_params += read_struct("11d 1i",data)
+		
 		nlinks = cell_params[-1]
+		links = []
 		for __ in range(nlinks):
-			parse_link(data)
-			#cell_params.append(parse_link(data))
+			links.append(parse_link(data))
+
+		cell_params.append(links)
 
 		cell_params += read_struct("1i 1? 3f 1i",data)
 		ngenes = cell_params[-1]
+		genes = []
 		for __ in range(ngenes):
-			parse_gene(data)
+			genes.append(parse_gene(data))
+
+		cell_params.append(genes)
 
 		cell_params += read_struct("3i 4d 1? 14f 2i 1d",data)
 
 		cells.append(zip_params(cell_fields,cell_params))
 
+
 	return (param,cells)
 
-substrate_data = get_file_bytes(sys.argv[1],False)
-substrate_params = parse_substrate(substrate_data)
-print_params(substrate_params)
-with open(sys.argv[1],'rb') as f:
-	f.seek(len(STREAM_MAGIC)+len(TC_BLOCKDATA)+1+len(substrate_data))
-	compressed = f.read()
+if __name__ == '__main__':
+	substrate_data = get_file_bytes(sys.argv[1],False)
+	substrate_params = parse_substrate(substrate_data)
+	print_params(substrate_params)
+	with open(sys.argv[1],'rb') as f:
+		f.seek(len(STREAM_MAGIC)+len(TC_BLOCKDATA)+1+len(substrate_data))
+		compressed = f.read()
 
-with open('test.g','wb') as f:
-	f.write(gzip.decompress(compressed))
+	with open('test.g','wb') as f:
+		f.write(gzip.decompress(compressed))
 
-data = get_bytes(gzip.decompress(compressed))
-param,cells = parse_gzip(data,substrate_params['cell_count'])
-print()
-print(param)
-print()
-for cell in cells:
-	input('Press Enter to see next cell')
+	data = get_bytes(gzip.decompress(compressed))
+	param,cells = parse_gzip(data,substrate_params['cell_count'])
 	print()
-	print_params(cell)
+	print(param)
+	print()
+	for cell in cells:
+		input('Press Enter to see next cell')
+		print()
+		print_params(cell)
