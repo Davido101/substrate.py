@@ -71,17 +71,16 @@ def print_params(data,depth=0):
 
 			key = key[0]
 
+		prefix = '' if depth == 0 else '-'*depth+' '
+
 		key = key.replace('_',' ')
 		if isinstance(value,bool): value = 'yes' if value else 'no'
-		elif isinstance(value,list):
-			print(f"{key}:")
-			for e in value:
-				print_params(e,depth+1)
-
+		elif isinstance(value,OrderedDict):
+			print(f"{prefix}{key}:")
+			print_params(value,depth+1)
 			continue
 		else: value *= factor
 
-		prefix = '' if depth == 0 else '-'*depth+' '
 		print(f"{prefix}{key}: {value}{unit}")
 
 def parse_substrate(data):
@@ -110,11 +109,11 @@ def parse_link(data):
 	return zip_params(link_fields,read_struct("1i 2d 1? 2d 2f",data))
 
 def parse_gene(data):
-	gene_fields = (None,None,None,None,None,
-				   None,None,None,None,None,
-				   None,None,None,None,None,
-				   None,None,None,None,None,
-				   None,None,None,None,None,None)
+	gene_fields = ('red','green','blue','split_mass','split_ratio',
+				   'split_angle','child1_angle','child2_angle','nutrient_priority','child1',
+				   'child2','make_adhesin','child1_adhesin','child2_adhesin','cell_type',
+				   None,'prioritize','initial','child1_mirror','child2_mirror',
+                   'adhesin_stiffness','adhesin_length','cytoskeleton','max_connections',None,None)
 
 	gene_params = read_struct("1i 9f 2i 3? 2i 4? 1f",data)
 	extra0 = []
@@ -151,19 +150,21 @@ def parse_gzip(data,ncells):
 		cell_params += read_struct("11d 1i",data)
 		
 		nlinks = cell_params[-1]
+		link_list_fields = tuple(f'link {i+1}' for i in range(nlinks))
 		links = []
 		for __ in range(nlinks):
 			links.append(parse_link(data))
 
-		cell_params.append(links)
+		cell_params.append(zip_params(link_list_fields,links))
 
 		cell_params += read_struct("1i 1? 3f 1i",data)
 		ngenes = cell_params[-1]
+		mode_fields = tuple(f'm{i+1}' for i in range(ngenes))
 		genes = []
 		for __ in range(ngenes):
 			genes.append(parse_gene(data))
 
-		cell_params.append(genes)
+		cell_params.append(zip_params(mode_fields,genes))
 
 		cell_params += read_struct("3i 4d 1? 14f 2i 1d",data)
 
