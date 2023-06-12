@@ -60,18 +60,16 @@ def read_struct(form,f,big_endian=True):
 	return list(struct.unpack(form,data))
 
 def zip_params(fields,params):
+	fields = list(fields)
+	for i in range(len(fields)):
+		if fields[i] is None: fields[i] = f'Unknown{i}'
+
 	return OrderedDict(zip(fields,params))
 
 def print_params(data,depth=0):
-	if DEBUG:
-		for key,value in data.items():
-			if key is not None: continue
-			print(value)
-
-		return
+	prefix = '' if depth == 0 else '-'*depth+' '
 
 	for key in data:
-		if key is None: continue
 		factor = 1
 		unit = ''
 		value = data[key]
@@ -82,8 +80,6 @@ def print_params(data,depth=0):
 
 			key = key[0]
 
-		prefix = '' if depth == 0 else '-'*depth+' '
-
 		key = key.replace('_',' ')
 		if isinstance(value,bool): value = 'yes' if value else 'no'
 		elif isinstance(value,OrderedDict):
@@ -91,6 +87,7 @@ def print_params(data,depth=0):
 			print_params(value,depth+1)
 			continue
 		else: value *= factor
+		if isinstance(key,str) and key.startswith("Unknown") ^ DEBUG: continue
 
 		print(f"{prefix}{key}: {value}{unit}")
 
