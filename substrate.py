@@ -3,6 +3,7 @@ import sys
 from collections import OrderedDict
 from io import BytesIO
 import gzip
+from math import pi
 
 STREAM_MAGIC = bytes.fromhex('ac ed 00 05')
 TC_BLOCKDATA = bytes.fromhex('77')
@@ -109,33 +110,39 @@ def parse_link(data):
 	return zip_params(link_fields,read_struct("1i 2d 1? 2d 2f",data))
 
 def parse_gene(data):
-	gene_fields = ('red','green','blue','split_mass','split_ratio',
-				   'split_angle','child1_angle','child2_angle','nutrient_priority','child1',
+	gene_fields = ('gene_version','red','green','blue',('split_mass',10,'ng'),'split_ratio',
+				   ('split_angle',180/pi,'°'),('child1_angle',180/pi,'°'),('child2_angle',180/pi,'°'),'nutrient_priority','child1',
 				   'child2','make_adhesin','child1_adhesin','child2_adhesin','cell_type',
 				   None,'prioritize','initial','child1_mirror','child2_mirror',
                    'adhesin_stiffness','adhesin_length','cytoskeleton','max_connections',None,None)
 
-	gene_params = read_struct("1i 9f 2i 3? 2i 4? 1f",data)
+	gene_version = read_int(data)
+	if gene_version != 95:
+		error(f"Unsupported gene version: {gene_version}")
+
+	gene_params = [gene_version]
+	gene_params += read_struct("9f 2i 3? 2i 4? 1f",data)
 	extra0 = []
 	for _ in range(12):
 		extra0.append(read_struct("2h 3f",data))
 
 	extra1 = read_struct("12i",data)
 	gene_params += read_struct("2f",data)
+	gene_params.append(extra1[5])
 	gene_params.append(extra0)
 	gene_params.append(extra1)
 	return zip_params(gene_fields,gene_params)
 
-def parse_gzip(data,ncells):
+def parse_gzip(data,ncells,substrate_diameter):
 	cell_fields = ('genome_version','x','y',None,None,
-				   ('x_speed',500,'µm/h'),('y_speed',500,'µm/h'),None,None,('cell_diameter',1000,'µm'),
-				   ('cell_mass',10,'ng'),('cell_age',1,'h'),'adhesin_connection_count','adhesin_connections',None,
+				   ('x_speed',500*substrate_diameter,'µm/h'),('y_speed',500*substrate_diameter,'µm/h'),None,None,('cell_diameter',1000,'µm'),
+				   ('cell_mass',10,'ng'),('cell_age',1,'h'),'adhesin_connection_count',None,
 				   None,None,None,None,'gene_count',
-				   'genes',None,None,None,None,
+				   None,None,None,None,
 				   None,None,('nitrogen_reserve',100,'%'),None,None,
 				   None,None,None,None,None,
 				   None,None,('toxins',100,'%'),('cell_injury',100,'%'),None,
-				   None,None,('lipids',10,'ng'),None,None,None)
+				   None,None,('lipids',10,'ng'),None,None,None,'genes','adhesin_connections')
 
 	data = BytesIO(data)
 	param = read_double(data)
@@ -155,8 +162,6 @@ def parse_gzip(data,ncells):
 		for __ in range(nlinks):
 			links.append(parse_link(data))
 
-		cell_params.append(zip_params(link_list_fields,links))
-
 		cell_params += read_struct("1i 1? 3f 1i",data)
 		ngenes = cell_params[-1]
 		mode_fields = tuple(f'm{i+1}' for i in range(ngenes))
@@ -164,14 +169,19 @@ def parse_gzip(data,ncells):
 		for __ in range(ngenes):
 			genes.append(parse_gene(data))
 
-		cell_params.append(zip_params(mode_fields,genes))
-
 		cell_params += read_struct("3i 4d 1? 14f 2i 1d",data)
+
+		cell_params.append(zip_params(mode_fields,genes))
+		cell_params.append(zip_params(link_list_fields,links))
 
 		cells.append(zip_params(cell_fields,cell_params))
 
+	nfood = read_int(data)
+	nutrients = []
+	for _ in range(nfood):
+		nutrients.append(read_struct("6f",data))
 
-	return (param,cells)
+	return (param,cells,nutrients)
 
 if __name__ == '__main__':
 	substrate_data = get_file_bytes(sys.argv[1],False)
@@ -185,11 +195,14 @@ if __name__ == '__main__':
 		f.write(gzip.decompress(compressed))
 
 	data = get_bytes(gzip.decompress(compressed))
-	param,cells = parse_gzip(data,substrate_params['cell_count'])
+	param,cells,nutrients = parse_gzip(data,substrate_params['cell_count'],substrate_params['substrate_diameter'])
 	print()
 	print(param)
-	print()
 	for cell in cells:
+		print()
 		input('Press Enter to see next cell')
 		print()
 		print_params(cell)
+
+	print()
+	print(f"nutrient count: {len(nutrients)}")
