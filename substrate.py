@@ -4,6 +4,9 @@ from collections import OrderedDict
 from io import BytesIO
 import gzip
 from math import pi
+import numpy as np
+
+DEBUG = False
 
 STREAM_MAGIC = bytes.fromhex('ac ed 00 05')
 TC_BLOCKDATA = bytes.fromhex('77')
@@ -60,7 +63,14 @@ def zip_params(fields,params):
 	return OrderedDict(zip(fields,params))
 
 def print_params(data,depth=0):
-	for key in data.keys():
+	if DEBUG:
+		for key,value in data.items():
+			if key is not None: continue
+			print(value)
+
+		return
+
+	for key in data:
 		if key is None: continue
 		factor = 1
 		unit = ''
@@ -206,3 +216,5 @@ if __name__ == '__main__':
 
 	print()
 	print(f"nutrient count: {len(nutrients)}")
+	if DEBUG and len(nutrients) > 0:
+		print(f"Average nutrient data: {', '.join(map(str,np.average(nutrients,axis=0)))}")
