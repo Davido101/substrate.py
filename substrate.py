@@ -203,10 +203,10 @@ if __name__ == '__main__':
 
 	data = get_bytes(gzip.decompress(compressed))
 	param,cells,nutrients = parse_gzip(data,substrate_params['cell_count'],substrate_params['substrate_diameter'])
-	if DEDUG:
+	if DEBUG:
 		print()
 		print(param)
-	
+
 	for cell in cells:
 		print()
 		input('Press Enter to see next cell')
