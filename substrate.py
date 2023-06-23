@@ -113,7 +113,7 @@ def parse_substrate(data):
 	return zip_params(substrate_fields,params)
 
 def parse_link(data):
-	link_fields = (None,None,None,None,None,None,None,None)
+	link_fields = ('connected_cell','connected_cell_angle','root_cell_angle',None,None,None,None,None)
 	return zip_params(link_fields,read_struct("1i 2d 1? 2d 2f",data))
 
 def parse_gene(data):
@@ -140,16 +140,20 @@ def parse_gene(data):
 	gene_params.append(extra1)
 	return zip_params(gene_fields,gene_params)
 
+def parse_food(data):
+	food_fields = ('x','y','nutrient_size',None,None,'nutrient_coating')
+	return zip_params(food_fields,read_struct("6f",data))
+
 def parse_gzip(data,ncells,substrate_diameter):
-	cell_fields = ('genome_version','x','y',None,None,
+	cell_fields = ('genome_version','x','y','angle',None,
 				   ('x_speed',500*substrate_diameter,'µm/h'),('y_speed',500*substrate_diameter,'µm/h'),None,None,('cell_diameter',1000,'µm'),
-				   ('cell_mass',10,'ng'),('cell_age',1,'h'),'adhesin_connection_count',None,
-				   None,None,None,None,'gene_count',
-				   None,None,None,None,
-				   None,None,('nitrogen_reserve',100,'%'),None,None,
+				   ('cell_mass',10,'ng'),('cell_age',1,'h'),'adhesin_connection_count',None,None,
+				   None,None,None,'gene_count','initial_mode',
 				   None,None,None,None,None,
-				   None,None,('toxins',100,'%'),('cell_injury',100,'%'),None,
-				   None,None,('lipids',10,'ng'),None,None,None,'genes','adhesin_connections')
+				   ('nitrogen_reserve',100,'%'),None,None,None,None,
+				   None,None,None,None,None,
+				   ('toxins',100,'%'),('cell_injury',100,'%'),None,None,None,
+				   ('lipids',10,'ng'),None,None,None,'genes','adhesin_connections')
 
 	data = BytesIO(data)
 	param = read_double(data)
@@ -186,7 +190,7 @@ def parse_gzip(data,ncells,substrate_diameter):
 	nfood = read_int(data)
 	nutrients = []
 	for _ in range(nfood):
-		nutrients.append(read_struct("6f",data))
+		nutrients.append(parse_food(data))
 
 	return (param,cells,nutrients)
 
@@ -215,5 +219,7 @@ if __name__ == '__main__':
 
 	print()
 	print(f"nutrient count: {len(nutrients)}")
-	if DEBUG and len(nutrients) > 0:
-		print(f"Average nutrient data: {', '.join(map(str,np.average(nutrients,axis=0)))}")
+	if len(nutrients) > 0:
+		print("Average nutrient data:")
+		food_params = map(str,np.average(list(map(lambda f:list(f.values()),nutrients)),axis=0))
+		print_params(zip_params(nutrients[0].keys(),food_params),depth=1)
