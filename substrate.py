@@ -19,6 +19,8 @@ read_double = lambda f:struct.unpack('>d',f.read(8))[0]
 read_size = lambda f:btd(f.read(1))
 read_size_long = lambda f:btd(f.read(4))
 
+tags = ['challenge','user','contaminate','infected challenge','infected user','infected contaminate','hybrid']
+
 def error(msg):
 	print(msg)
 	exit()
@@ -89,6 +91,8 @@ def print_params(data,depth=0):
 		else: value *= factor
 		if isinstance(key,str) and key.startswith("Unknown") ^ DEBUG: continue
 
+		if key == 'mode': value = value+1
+		elif key == 'tag': value = tags[value]
 		print(f"{prefix}{key}: {value}{unit}")
 
 def parse_substrate(data):
@@ -141,19 +145,19 @@ def parse_gene(data):
 	return zip_params(gene_fields,gene_params)
 
 def parse_food(data):
-	food_fields = ('x','y','nutrient_size',None,None,'nutrient_coating')
+	food_fields = ('x','y','nutrient_size','x_velocity','y_velocity','coating')
 	return zip_params(food_fields,read_struct("6f",data))
 
 def parse_gzip(data,ncells,substrate_diameter):
 	cell_fields = ('genome_version','x','y','angle',None,
-				   ('x_speed',500*substrate_diameter,'µm/h'),('y_speed',500*substrate_diameter,'µm/h'),None,None,('cell_diameter',1000,'µm'),
-				   ('cell_mass',10,'ng'),('cell_age',1,'h'),'adhesin_connection_count',None,None,
-				   None,None,None,'gene_count','initial_mode',
+				   ('x_velocity',500*substrate_diameter,'µm/h'),('y_velocity',500*substrate_diameter,'µm/h'),('angular_velocity',1,'rad/h'),None,('diameter',1000,'µm'),
+				   ('mass',10,'ng'),('age',1,'h'),'adhesin_connection_count','link_count','dead',
+				   'red','green','blue','gene_count','mode',
+				   'tag',None,None,None,None,
+				   ('nitrogen_reserve',100,'%'),'mirrored',None,None,None,
 				   None,None,None,None,None,
-				   ('nitrogen_reserve',100,'%'),None,None,None,None,
-				   None,None,None,None,None,
-				   ('toxins',100,'%'),('cell_injury',100,'%'),None,None,None,
-				   ('lipids',10,'ng'),None,None,None,'genes','adhesin_connections')
+				   ('toxins',100,'%'),('injury',100,'%'),None,None,None,
+				   ('lipids',10,'ng'),'mutations','telomeres','lift','genes','adhesin_connections')
 
 	data = BytesIO(data)
 	param = read_double(data)
