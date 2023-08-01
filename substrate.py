@@ -117,7 +117,7 @@ def parse_substrate(data):
 	return zip_params(substrate_fields,params)
 
 def parse_link(data):
-	link_fields = ('connected_cell','connected_cell_angle','root_cell_angle',None,None,None,None,None)
+	link_fields = ('connected_cell','connected_cell_angle','root_cell_angle','originates_from_division',None,None,None,None)
 	return zip_params(link_fields,read_struct("1i 2d 1? 2d 2f",data))
 
 def parse_gene(data):
