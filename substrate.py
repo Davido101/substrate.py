@@ -229,6 +229,7 @@ if __name__ == '__main__':
 
 	print()
 	print_params({'nutrient_count': len(nutrients)})
-	food_params = map(str,np.average(list(map(lambda f:list(f.values()),nutrients)),axis=0))
-	food_params = {"average_nutrient_data":zip_params(nutrients[0].keys(),food_params)}
-	print_params(food_params)
+	if len(nutrients) > 0:
+		food_params = map(str,np.average(list(map(lambda f:list(f.values()),nutrients)),axis=0))
+		food_params = {"average_nutrient_data":zip_params(nutrients[0].keys(),food_params)}
+		print_params(food_params)
