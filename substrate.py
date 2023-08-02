@@ -6,15 +6,6 @@ import gzip
 from math import pi
 import numpy as np
 
-filename = None
-DEBUG = False
-for arg in sys.argv[1:]:
-	if arg == '-d':
-		DEBUG = True
-	else:
-		filename = arg
-		if not filename.endswith('.substrate'): filename += '.substrate'
-
 STREAM_MAGIC = bytes.fromhex('ac ed 00 05')
 TC_BLOCKDATA = bytes.fromhex('77')
 TC_BLOCKDATALONG = bytes.fromhex('7a')
@@ -167,7 +158,7 @@ def parse_gzip(data,ncells,substrate_diameter):
 				   ('lipids',10,'ng'),'mutations','telomeres','lift','genes','adhesin_connections')
 
 	data = BytesIO(data)
-	param = read_double(data)
+	light_angle = read_double(data)
 	cells = []
 
 	for _ in range(ncells):
@@ -203,33 +194,43 @@ def parse_gzip(data,ncells,substrate_diameter):
 	for _ in range(nfood):
 		nutrients.append(parse_food(data))
 
-	return (param,cells,nutrients)
+	return (light_angle,cells,nfood,nutrients)
 
-if __name__ == '__main__':
-	if filename is None: exit()
+def read_substrate_file(filename):
 	substrate_data = get_file_bytes(filename,False)
 	substrate_params = parse_substrate(substrate_data)
-	print_params(substrate_params)
 	with open(filename,'rb') as f:
 		f.seek(len(STREAM_MAGIC)+len(TC_BLOCKDATA)+1+len(substrate_data))
 		compressed = f.read()
 
-	with open('test.g','wb') as f:
-		f.write(gzip.decompress(compressed))
-
 	data = get_bytes(gzip.decompress(compressed))
-	light_angle,cells,nutrients = parse_gzip(data,substrate_params['cell_count'],substrate_params['substrate_diameter'])
-	print_params({('substrate_light_angle',1,'rad'):light_angle})
+	light_angle,cells,nfood,nutrients = parse_gzip(data,substrate_params['cell_count'],substrate_params['substrate_diameter'])
+	substrate_params['nutrient_count'] = nfood
+	substrate_params[('substrate_light_angle',180/pi,'°')] = light_angle
 
+	return (substrate_params,cells,nutrients)
+
+if __name__ == '__main__':
+	filename = None
+	DEBUG = False
+	for arg in sys.argv[1:]:
+		if arg == '-d':
+			DEBUG = True
+		else:
+			filename = arg
+			if not filename.endswith('.substrate'): filename += '.substrate'
+
+	if filename is None: exit()
+	substrate_params,cells,nutrients = read_substrate_file(filename)
+	print_params(substrate_params)
 	for cell in cells:
 		print()
 		input('Press Enter to see next cell')
 		print()
 		print_params(cell)
 
-	print()
-	print_params({'nutrient_count': len(nutrients)})
-	if len(nutrients) > 0:
+	if substrate_params['nutrient_count'] > 0:
+		print()
 		food_params = map(str,np.average(list(map(lambda f:list(f.values()),nutrients)),axis=0))
 		food_params = {"average_nutrient_data":zip_params(nutrients[0].keys(),food_params)}
 		print_params(food_params)
