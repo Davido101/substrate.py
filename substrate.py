@@ -6,7 +6,14 @@ import gzip
 from math import pi
 import numpy as np
 
+filename = None
 DEBUG = False
+for arg in sys.argv[1:]:
+	if arg == '-d':
+		DEBUG = True
+	else:
+		filename = arg
+		if not filename.endswith('.substrate'): filename += '.substrate'
 
 STREAM_MAGIC = bytes.fromhex('ac ed 00 05')
 TC_BLOCKDATA = bytes.fromhex('77')
@@ -149,7 +156,7 @@ def parse_food(data):
 	return zip_params(food_fields,read_struct("6f",data))
 
 def parse_gzip(data,ncells,substrate_diameter):
-	cell_fields = ('genome_version','x','y','angle',None,
+	cell_fields = ('genome_version','x','y',('angle',1,'rad'),None,
 				   ('x_velocity',500*substrate_diameter,'µm/h'),('y_velocity',500*substrate_diameter,'µm/h'),('angular_velocity',1,'rad/h'),None,('diameter',1000,'µm'),
 				   ('mass',10,'ng'),('age',1,'h'),'adhesin_connection_count','link_count','dead',
 				   'red','green','blue','gene_count','mode',
@@ -199,10 +206,11 @@ def parse_gzip(data,ncells,substrate_diameter):
 	return (param,cells,nutrients)
 
 if __name__ == '__main__':
-	substrate_data = get_file_bytes(sys.argv[1],False)
+	if filename is None: exit()
+	substrate_data = get_file_bytes(filename,False)
 	substrate_params = parse_substrate(substrate_data)
 	print_params(substrate_params)
-	with open(sys.argv[1],'rb') as f:
+	with open(filename,'rb') as f:
 		f.seek(len(STREAM_MAGIC)+len(TC_BLOCKDATA)+1+len(substrate_data))
 		compressed = f.read()
 
@@ -210,10 +218,8 @@ if __name__ == '__main__':
 		f.write(gzip.decompress(compressed))
 
 	data = get_bytes(gzip.decompress(compressed))
-	param,cells,nutrients = parse_gzip(data,substrate_params['cell_count'],substrate_params['substrate_diameter'])
-	if DEBUG:
-		print()
-		print(param)
+	light_angle,cells,nutrients = parse_gzip(data,substrate_params['cell_count'],substrate_params['substrate_diameter'])
+	print_params({('substrate_light_angle',1,'rad'):light_angle})
 
 	for cell in cells:
 		print()
@@ -222,8 +228,7 @@ if __name__ == '__main__':
 		print_params(cell)
 
 	print()
-	print(f"nutrient count: {len(nutrients)}")
-	if len(nutrients) > 0:
-		print("Average nutrient data:")
-		food_params = map(str,np.average(list(map(lambda f:list(f.values()),nutrients)),axis=0))
-		print_params(zip_params(nutrients[0].keys(),food_params),depth=1)
+	print_params({'nutrient_count': len(nutrients)})
+	food_params = map(str,np.average(list(map(lambda f:list(f.values()),nutrients)),axis=0))
+	food_params = {"average_nutrient_data":zip_params(nutrients[0].keys(),food_params)}
+	print_params(food_params)
